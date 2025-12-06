@@ -2,23 +2,20 @@ import streamlit as st
 import pandas as pd
 
 # ---------------------------------------------------
-# 🔧 ตั้งค่าให้หน้าเว็บแสดงแบบกว้างเต็มจอ
+# 🖥 ตั้งค่าหน้าเว็บแบบกว้าง
 # ---------------------------------------------------
 st.set_page_config(layout="wide")
 
 # ---------------------------------------------------
-# 🎨 CSS บังคับขยายตารางให้เต็มหน้า
+# 🎨 CSS ขยายตารางให้เต็มหน้า
 # ---------------------------------------------------
 st.markdown("""
 <style>
-/* container ใหญ่สุดของ Streamlit */
 .block-container {
     max-width: 100% !important;
     padding-left: 1rem;
     padding-right: 1rem;
 }
-
-/* ให้ DataFrame/table ขยายเต็มความกว้าง */
 .stDataFrame, .dataframe {
     width: 100% !important;
     max-width: 100% !important;
@@ -26,13 +23,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
 # ---------------------------------------------------
-# 🔗 URLs ของ Google Sheets (CSV Export)
+# 🔗 Google Sheets URLs
 # ---------------------------------------------------
 BRANCH_URL = "https://docs.google.com/spreadsheets/d/1mDVLSD2VWvIEX3pr68hdntZYtqeO7IQZXopvyLEeM6E/export?format=csv"
 MASTER_BASE = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&gid="
-
 
 # ---------------------------------------------------
 # 📌 โหลด Branch List
@@ -40,38 +35,91 @@ MASTER_BASE = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xE
 branch_df = pd.read_csv(BRANCH_URL)
 branch_list = branch_df["Branch_Name"].dropna().tolist()
 
-st.title("📍 เลือกสาขา")
-
-branch_name = st.selectbox("เลือกสาขา", branch_list)
-
-st.write("### คุณเลือก:", branch_name)
-
-
 # ---------------------------------------------------
-# 📌 Map: ชื่อสาขา → gid ของแท็บใน Master File
+# 📌 Mapping: สาขา → gid (ต้องใส่ gid จริง)
 # ---------------------------------------------------
 sheet_gid_map = {
-    "B01": "539180310",         # gid ของแท็บ B01
-    "B02": "1398594410",    # ใส่ gid จริงของคุณแทนที่
-    "B03": "475910523",    # ใส่ gid จริงของคุณแทนที่
+    "B01": "0",
+    "B02": "123456",
+    "B03": "789012",
 }
 
+# ---------------------------------------------------
+# 🧭 Navigation — ใช้ session_state
+# ---------------------------------------------------
+if "page" not in st.session_state:
+    st.session_state.page = "overview"
+if "selected_branch" not in st.session_state:
+    st.session_state.selected_branch = None
 
 # ---------------------------------------------------
-# ❌ ถ้าไม่มี gid → แจ้งเตือน
+# 🔘 ฟังก์ชันไปหน้ารายละเอียดสาขา
 # ---------------------------------------------------
-if branch_name not in sheet_gid_map:
-    st.error("ยังไม่มีข้อมูลสาขานี้ใน Master Data")
-else:
-    gid = sheet_gid_map[branch_name]
-    master_url = MASTER_BASE + gid
+def go_to_branch(branch):
+    st.session_state.selected_branch = branch
+    st.session_state.page = "detail"
 
-    # โหลดข้อมูลจากแท็บของสาขานั้น
-    df = pd.read_csv(master_url)
+# ---------------------------------------------------
+# 📍 หน้า Overview — สรุปทุกสาขา ปี 2567
+# ---------------------------------------------------
+if st.session_state.page == "overview":
 
-    st.write(f"### 📊 ยอดขายสาขา: {branch_name}")
+    st.title("📊 ภาพรวมยอดขายทุกสาขา (ปี 2567)")
 
-    # ---------------------------------------------------
-    # 🎯 แสดงตารางแบบเต็มจอ
-    # ---------------------------------------------------
-    st.dataframe(df, use_container_width=True)
+    overview_rows = []
+
+    for branch in branch_list:
+        if branch not in sheet_gid_map:
+            continue
+        
+        gid = sheet_gid_map[branch]
+        url = MASTER_BASE + gid
+        
+        df = pd.read_csv(url)
+
+        # ดึงเฉพาะปี 2567
+        df_2567 = df[df["Year"] == 2567]
+
+        if not df_2567.empty:
+            total = df_2567["Total"].iloc[0]
+        else:
+            total = 0
+
+        overview_rows.append({
+            "สาขา": branch,
+            "ยอดรวมปี 2567": total
+        })
+
+    overview_df = pd.DataFrame(overview_rows)
+
+    st.dataframe(overview_df, use_container_width=True)
+
+    st.write("### 🔍 คลิกสาขาที่ต้องการดูรายละเอียด")
+
+    # สร้างปุ่มเลือกสาขาแบบคลิกได้
+    for branch in branch_list:
+        if branch in sheet_gid_map:
+            if st.button(f"ดูรายละเอียดสาขา {branch}", key=f"btn_{branch}"):
+                go_to_branch(branch)
+
+# ---------------------------------------------------
+# 📍 หน้า Detail — รายละเอียดทุกปีของสาขาที่เลือก
+# ---------------------------------------------------
+elif st.session_state.page == "detail":
+
+    branch = st.session_state.selected_branch
+
+    st.title(f"📍 รายละเอียดรายปีของสาขา {branch}")
+
+    if branch not in sheet_gid_map:
+        st.error("ยังไม่มีข้อมูลของสาขานี้ใน Master File")
+    else:
+        gid = sheet_gid_map[branch]
+        url = MASTER_BASE + gid
+        
+        df = pd.read_csv(url)
+
+        st.dataframe(df, use_container_width=True)
+
+    # ปุ่มกลับหน้าหลัก
+    st.button("⬅️ กลับหน้าหลัก", on_click=lambda: st.session_state.update({"page": "overview"}))
