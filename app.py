@@ -3,45 +3,48 @@ import pandas as pd
 
 st.header("📊 รายงานยอดขายรายสาขา (Jan–Dec)")
 
-# โหลดไฟล์จากผู้ใช้
 uploaded_file = st.file_uploader("อัปโหลดไฟล์ยอดขาย (Excel)", type=["xlsx"])
 
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
-    # ตรวจสอบและแปลงคอลัมน์เดือนให้เป็นลำดับถูกต้อง
-    month_order = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+    # ลำดับเดือน
+    month_order = ["January","February","March","April","May","June","July",
+                   "August","September","October","November","December"]
 
-    # ทำให้ชื่อคอลัมน์เหมือนกัน (กรณีใช้ชื่อไทยหรือรูปแบบอื่น)
+    # ทำความสะอาดชื่อคอลัมน์
     df.columns = [str(c).strip() for c in df.columns]
 
-    # เลือกเฉพาะคอลัมน์เดือน + สาขา
+    # ระบุคอลัมน์เดือนที่มีอยู่จริงในไฟล์
     month_cols = [m for m in month_order if m in df.columns]
 
-    # dropdown เลือกสาขา
+    # แปลงคอลัมน์เดือนเป็นตัวเลข (ถ้าแปลงไม่ได้ ให้เป็น 0)
+    for m in month_cols:
+        df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
+
+    # Dropdown เลือกสาขา
     branch_list = df["Branch"].unique()
     selected_branch = st.selectbox("เลือกสาขา", branch_list)
 
-    # กรองข้อมูลเฉพาะสาขา
-    branch_data = df[df["Branch"] == selected_branch]
-
-    # แสดงตาราง Jan–Dec
     st.subheader(f"📍 ยอดขายสาขา: {selected_branch}")
 
+    branch_data = df[df["Branch"] == selected_branch]
+
+    # ตารางสรุป Jan–Dec
     display_df = branch_data[["Branch"] + month_cols].copy()
     display_df["Total"] = display_df[month_cols].sum(axis=1)
 
     st.dataframe(display_df.style.format("{:,.0f}"))
 
-    # ทำกราฟรายเดือน
+    # สรุปยอดรวมรายเดือนเพื่อทำกราฟ
     monthly_sum = branch_data[month_cols].sum()
 
+    st.subheader("📈 กราฟแนวโน้มยอดขายรายเดือน")
     st.line_chart(monthly_sum)
 
-    # KPI Summary
-    st.subheader("✨ สรุปผลทั้งปี")
-
+    # KPI สรุปทั้งปี
+    st.subheader("✨ สรุปผลรวมทั้งปี")
     col1, col2, col3 = st.columns(3)
     col1.metric("ยอดรวมทั้งปี", f"{monthly_sum.sum():,.0f} บาท")
-    col2.metric("เดือนที่สูงสุด", monthly_sum.idxmax())
-    col3.metric("เดือนที่ต่ำสุด", monthly_sum.idxmin())
+    col2.metric("เดือนยอดสูงสุด", monthly_sum.idxmax())
+    col3.metric("เดือนยอดต่ำสุด", monthly_sum.idxmin())
