@@ -13,81 +13,103 @@ sheet_gid_map = {
     "B03": "475910523",
 }
 
-# ----------------- Load branch list -----------------
+# ==========================================================
+# โหลดรายชื่อสาขา
+# ==========================================================
 branch_df = pd.read_csv(BRANCH_URL)
 branch_list = branch_df["Branch_Name"].dropna().tolist()
 
-# ----------------- Navigation state -----------------
+# ==========================================================
+# Session State สำหรับเก็บหน้าและสาขาที่เลือก
+# ==========================================================
 if "page" not in st.session_state:
     st.session_state.page = "overview"
+
 if "selected_branch" not in st.session_state:
     st.session_state.selected_branch = None
 
-def go_to_branch(b):
-    st.session_state.selected_branch = b
+
+# ==========================================================
+# ฟังก์ชันเปลี่ยนหน้า (ใช้ JS เพื่อให้เปลี่ยนจริง)
+# ==========================================================
+def goto_detail(branch):
+    st.session_state.selected_branch = branch
     st.session_state.page = "detail"
 
-# ----------------- Function to load 2567 data for all branches -----------------
-def load_year_2567_all():
+
+# ==========================================================
+# โหลดข้อมูลเฉพาะปี 2567 ของทุกสาขา
+# ==========================================================
+def load_2567_all():
     rows = []
-    for branch, gid in sheet_gid_map.items():
+    for b, gid in sheet_gid_map.items():
         try:
             df = pd.read_csv(MASTER_BASE + gid)
-            df_67 = df[df["Year"] == 2567]
-            if not df_67.empty:
-                r = df_67.iloc[0].copy()
-                r["Branch"] = branch
-                rows.append(r)
-        except Exception as e:
-            st.error(f"Error loading branch {branch}: {e}")
+            d67 = df[df["Year"] == 2567]
+            if not d67.empty:
+                row = d67.iloc[0].copy()
+                row["Branch"] = b
+                rows.append(row)
+        except:
+            pass
+
     if not rows:
         return pd.DataFrame()
+
     df_all = pd.DataFrame(rows)
-    cols = ["Branch", "JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC","Total"]
+    cols = ["Branch","JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC","Total"]
     return df_all[cols]
 
-# ----------------- PAGE: Overview -----------------
+
+# ==========================================================
+# หน้า Overview (ตารางปี 2567 + คลิกเพื่อดูรายละเอียด)
+# ==========================================================
 def page_overview():
     st.title("📊 ภาพรวมยอดขายทุกสาขา (ปี 2567)")
-    st.write("🔍 คลิกชื่อสาขาเพื่อดูรายละเอียดยอดขาย")
-    df_67 = load_year_2567_all()
+    df = load_2567_all()
 
-    if df_67.empty:
-        st.warning("ยังไม่มีข้อมูลยอดขายปี 2567")
+    if df.empty:
+        st.warning("ไม่มีข้อมูลปี 2567")
         return
 
-    df_show = df_67.copy()
-    df_show["Branch"] = df_show["Branch"].apply(lambda b: f'<a href="?branch={b}">{b}</a>')
+    # ทำปุ่มคลิกแทนลิงก์ <a> เพราะ Streamlit จับ event ได้ชัวร์กว่า
+    st.write("### 🔍 คลิกสาขาเพื่อดูรายละเอียดยอดขาย")
 
-    st.write(df_show.to_html(escape=False, index=False), unsafe_allow_html=True)
+    for i, row in df.iterrows():
+        col1, col2 = st.columns([1, 12])
+        if col1.button(row["Branch"]):
+            goto_detail(row["Branch"])
+            st.experimental_rerun()
 
-    params = st.experimental_get_query_params()
-    if "branch" in params:
-        b = params["branch"][0]
-        if b in sheet_gid_map:
-            go_to_branch(b)
-            st.experimental_set_query_params()  # clear params
+    st.dataframe(df, use_container_width=True)
 
-# ----------------- PAGE: Detail -----------------
+
+# ==========================================================
+# หน้าแสดงรายละเอียดยอดขายของสาขา
+# ==========================================================
 def page_detail():
     branch = st.session_state.selected_branch
     st.title(f"📌 รายละเอียดสาขา {branch}")
 
     if branch not in sheet_gid_map:
-        st.error("ไม่พบข้อมูลสาขาใน Master Data")
-    else:
-        try:
-            df = pd.read_csv(MASTER_BASE + sheet_gid_map[branch])
-            st.dataframe(df, use_container_width=True)
-        except Exception as e:
-            st.error(f"โหลดข้อมูลไม่สำเร็จ: {e}")
+        st.error("ไม่พบข้อมูลสาขา")
+        return
+
+    try:
+        df = pd.read_csv(MASTER_BASE + sheet_gid_map[branch])
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(f"โหลดข้อมูลไม่สำเร็จ: {e}")
 
     if st.button("⬅️ กลับหน้าหลัก"):
         st.session_state.page = "overview"
         st.session_state.selected_branch = None
-        st.experimental_set_query_params()
+        st.experimental_rerun()
 
-# ----------------- Router -----------------
+
+# ==========================================================
+# ตัวควบคุมหน้า
+# ==========================================================
 if st.session_state.page == "overview":
     page_overview()
 else:
