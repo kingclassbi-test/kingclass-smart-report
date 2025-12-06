@@ -1,78 +1,77 @@
-import pandas as pd
 import streamlit as st
+import pandas as pd
 
-# ---------------------------
-# 1) Google Sheet CSV URLs
-# ---------------------------
+# ---------------------------------------------------
+# 🔧 ตั้งค่าให้หน้าเว็บแสดงแบบกว้างเต็มจอ
+# ---------------------------------------------------
+st.set_page_config(layout="wide")
 
-BRANCH_URL = "https://docs.google.com/spreadsheets/d/1mDVLSD2VWvIEX3pr68hdntZYtqeO7IQZXopvyLEeM6E/export?format=csv&gid=0"
-
-MASTER_BASE = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&gid="
-
-# ---------------------------
-# 2) กำหนด gid ของแต่ละสาขา
-# (จากแท็บใน Master Sheet)
-# ---------------------------
-
-sheet_gid_map = {
-    "B01": "539180310",          # gid ของ B01
-    "B02": "1398594410",     # ตัวอย่าง gid (ให้ใส่จริงตามไฟล์)
-    "B03": "475910523",  # gid ของ B03 (จากที่นิกให้มา)
+# ---------------------------------------------------
+# 🎨 CSS บังคับขยายตารางให้เต็มหน้า
+# ---------------------------------------------------
+st.markdown("""
+<style>
+/* container ใหญ่สุดของ Streamlit */
+.block-container {
+    max-width: 100% !important;
+    padding-left: 1rem;
+    padding-right: 1rem;
 }
 
-# ---------------------------
-# 3) โหลด Branch List
-# ---------------------------
+/* ให้ DataFrame/table ขยายเต็มความกว้าง */
+.stDataFrame, .dataframe {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
+
+# ---------------------------------------------------
+# 🔗 URLs ของ Google Sheets (CSV Export)
+# ---------------------------------------------------
+BRANCH_URL = "https://docs.google.com/spreadsheets/d/1mDVLSD2VWvIEX3pr68hdntZYtqeO7IQZXopvyLEeM6E/export?format=csv"
+MASTER_BASE = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&gid="
+
+
+# ---------------------------------------------------
+# 📌 โหลด Branch List
+# ---------------------------------------------------
 branch_df = pd.read_csv(BRANCH_URL)
 branch_list = branch_df["Branch_Name"].dropna().tolist()
 
-st.title("📌 เลือกสาขา")
+st.title("📍 เลือกสาขา")
 
 branch_name = st.selectbox("เลือกสาขา", branch_list)
 
-st.subheader(f"คุณเลือก: **{branch_name}**")
+st.write("### คุณเลือก:", branch_name)
 
-# ---------------------------
-# 4) ตรวจสอบว่ามี gid ของสาขานี้ไหม
-# ---------------------------
 
+# ---------------------------------------------------
+# 📌 Map: ชื่อสาขา → gid ของแท็บใน Master File
+# ---------------------------------------------------
+sheet_gid_map = {
+    "B01": "539180310",         # gid ของแท็บ B01
+    "B02": "1398594410",    # ใส่ gid จริงของคุณแทนที่
+    "B03": "475910523",    # ใส่ gid จริงของคุณแทนที่
+}
+
+
+# ---------------------------------------------------
+# ❌ ถ้าไม่มี gid → แจ้งเตือน
+# ---------------------------------------------------
 if branch_name not in sheet_gid_map:
-    st.error("⛔ ยังไม่มีข้อมูลสาขานี้ใน Master Data")
-    st.stop()
+    st.error("ยังไม่มีข้อมูลสาขานี้ใน Master Data")
+else:
+    gid = sheet_gid_map[branch_name]
+    master_url = MASTER_BASE + gid
 
-gid = sheet_gid_map[branch_name]
+    # โหลดข้อมูลจากแท็บของสาขานั้น
+    df = pd.read_csv(master_url)
 
-# URL สำหรับ Master Data ของแต่ละสาขา
-MASTER_URL = MASTER_BASE + gid
+    st.write(f"### 📊 ยอดขายสาขา: {branch_name}")
 
-# ---------------------------
-# 5) โหลดข้อมูลจาก Master
-# ---------------------------
-
-try:
-    df = pd.read_csv(MASTER_URL)
-except Exception as e:
-    st.error("⛔ โหลดข้อมูลไม่สำเร็จ โปรดตรวจสอบ gid หรือสิทธิ์การเข้าถึง Google Sheet")
-    st.write(e)
-    st.stop()
-
-# ---------------------------
-# 6) แสดงตารางเต็มหน้า (Wide mode)
-# ---------------------------
-
-st.write("### 📊 ยอดขายสาขา:", branch_name)
-
-# ทำให้ตารางเต็มหน้าจอโดยใช้ CSS
-st.markdown("""
-    <style>
-    .block-container {
-        padding-top: 1rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# แสดงตาราง
-st.dataframe(df, use_container_width=True)
+    # ---------------------------------------------------
+    # 🎯 แสดงตารางแบบเต็มจอ
+    # ---------------------------------------------------
+    st.dataframe(df, use_container_width=True)
