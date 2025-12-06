@@ -1,125 +1,126 @@
 import streamlit as st
 import pandas as pd
 
-# ---------------------------------------------------
-# 🖥 ตั้งค่าหน้าเว็บแบบกว้าง
-# ---------------------------------------------------
+# ----------------------------
+# Page config
+# ----------------------------
 st.set_page_config(layout="wide")
 
-# ---------------------------------------------------
-# 🎨 CSS ขยายตารางให้เต็มหน้า
-# ---------------------------------------------------
+# ----------------------------
+# Custom CSS – make the page full width
+# ----------------------------
 st.markdown("""
 <style>
-.block-container {
-    max-width: 100% !important;
-    padding-left: 1rem;
-    padding-right: 1rem;
-}
-.stDataFrame, .dataframe {
-    width: 100% !important;
-    max-width: 100% !important;
-}
+.block-container { max-width: 100% !important; padding-left: 1rem; padding-right: 1rem; }
+a { text-decoration: none !important; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------
-# 🔗 Google Sheets URLs
-# ---------------------------------------------------
+# ----------------------------
+# Google Sheet URLs
+# ----------------------------
 BRANCH_URL = "https://docs.google.com/spreadsheets/d/1mDVLSD2VWvIEX3pr68hdntZYtqeO7IQZXopvyLEeM6E/export?format=csv"
 MASTER_BASE = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&gid="
 
-# ---------------------------------------------------
-# 📌 โหลด Branch List
-# ---------------------------------------------------
+# ----------------------------
+# Load Branch List
+# ----------------------------
 branch_df = pd.read_csv(BRANCH_URL)
 branch_list = branch_df["Branch_Name"].dropna().tolist()
 
-# ---------------------------------------------------
-# 📌 Mapping: สาขา → gid (ต้องใส่ gid จริง)
-# ---------------------------------------------------
+# ----------------------------
+# Mapping branch → gid
+# ----------------------------
 sheet_gid_map = {
     "B01": "539180310",
     "B02": "1398594410",
     "B03": "475910523",
 }
 
-# ---------------------------------------------------
-# 🧭 Navigation — ใช้ session_state
-# ---------------------------------------------------
+# ----------------------------
+# Initialize navigation state
+# ----------------------------
 if "page" not in st.session_state:
     st.session_state.page = "overview"
 if "selected_branch" not in st.session_state:
     st.session_state.selected_branch = None
 
-# ---------------------------------------------------
-# 🔘 ฟังก์ชันไปหน้ารายละเอียดสาขา
-# ---------------------------------------------------
-def go_to_branch(branch):
-    st.session_state.selected_branch = branch
+def go_to_branch(b):
+    st.session_state.selected_branch = b
     st.session_state.page = "detail"
 
-# ---------------------------------------------------
-# 📍 หน้า Overview — สรุปทุกสาขา ปี 2567
-# ---------------------------------------------------
+
+# ============================================================
+#                     📍 PAGE 1: OVERVIEW
+# ============================================================
 if st.session_state.page == "overview":
 
     st.title("📊 ภาพรวมยอดขายทุกสาขา (ปี 2567)")
 
-    overview_rows = []
+    rows = []
 
     for branch in branch_list:
         if branch not in sheet_gid_map:
             continue
-        
+
         gid = sheet_gid_map[branch]
         url = MASTER_BASE + gid
-        
         df = pd.read_csv(url)
 
-        # ดึงเฉพาะปี 2567
         df_2567 = df[df["Year"] == 2567]
 
-        if not df_2567.empty:
-            total = df_2567["Total"].iloc[0]
-        else:
-            total = 0
+        if df_2567.empty:
+            continue
 
-        overview_rows.append({
-            "สาขา": branch,
-            "ยอดรวมปี 2567": total
-        })
+        row = df_2567.iloc[0].to_dict()
+        row["Branch"] = branch
 
-    overview_df = pd.DataFrame(overview_rows)
+        rows.append(row)
 
-    st.dataframe(overview_df, use_container_width=True)
+    # Convert to DataFrame
+    overview_df = pd.DataFrame(rows)
 
-    st.write("### 🔍 คลิกสาขาที่ต้องการดูรายละเอียด")
+    # จัดคอลัมน์ให้อยู่ลำดับที่ต้องการ
+    cols_order = ["Branch", "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "Total"]
 
-    # สร้างปุ่มเลือกสาขาแบบคลิกได้
-    for branch in branch_list:
-        if branch in sheet_gid_map:
-            if st.button(f"ดูรายละเอียดสาขา {branch}", key=f"btn_{branch}"):
-                go_to_branch(branch)
+    overview_df = overview_df[cols_order]
 
-# ---------------------------------------------------
-# 📍 หน้า Detail — รายละเอียดทุกปีของสาขาที่เลือก
-# ---------------------------------------------------
+    # เปลี่ยนชื่อคอลัมน์ให้สวยงาม
+    overview_df.rename(columns={"Branch": "สาขา", "Total": "ยอดรวมปี 2567"}, inplace=True)
+
+    # 🔗 ทำให้ชื่อสาขาคลิกได้ (Link)
+    def make_clickable(branch):
+        return f'<a href="?branch={branch}">{branch}</a>'
+
+    overview_df["สาขา"] = overview_df["สาขา"].apply(make_clickable)
+
+    # แสดงเป็น HTML table (รองรับคลิก)
+    st.write(overview_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+
+
+    # ตรวจจับ parameter จาก URL → ใช้สำหรับคลิก
+    query_params = st.experimental_get_query_params()
+    if "branch" in query_params:
+        selected = query_params["branch"][0]
+        go_to_branch(selected)
+
+
+# ============================================================
+#               📍 PAGE 2: Branch Detail Page
+# ============================================================
 elif st.session_state.page == "detail":
 
     branch = st.session_state.selected_branch
+    st.title(f"📌 รายละเอียดยอดขายสาขา {branch}")
 
-    st.title(f"📍 รายละเอียดรายปีของสาขา {branch}")
+    gid = sheet_gid_map[branch]
+    url = MASTER_BASE + gid
+    df = pd.read_csv(url)
 
-    if branch not in sheet_gid_map:
-        st.error("ยังไม่มีข้อมูลของสาขานี้ใน Master File")
-    else:
-        gid = sheet_gid_map[branch]
-        url = MASTER_BASE + gid
-        
-        df = pd.read_csv(url)
+    st.dataframe(df, use_container_width=True)
 
-        st.dataframe(df, use_container_width=True)
-
-    # ปุ่มกลับหน้าหลัก
-    st.button("⬅️ กลับหน้าหลัก", on_click=lambda: st.session_state.update({"page": "overview"}))
+    # ปุ่มกลับหน้าแรก
+    if st.button("⬅️ กลับหน้าหลัก"):
+        st.session_state.page = "overview"
+        st.experimental_set_query_params()  # clear URL params
