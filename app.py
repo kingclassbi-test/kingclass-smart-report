@@ -15,9 +15,9 @@ st.write("คุณเลือก:", branch_name)
 
 # 2) ดึง gid ของแท็บใน Master ตามชื่อสาขา
 sheet_gid_map = {
-    "B01": "gid=539180310",      # https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/edit?gid=539180310#gid=539180310
-    "B02": "gid=1398594410", # https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/edit?gid=1398594410#gid=1398594410
-    "B03": "gid=475910523", # https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/edit?gid=475910523#gid=475910523
+    "B01": "539180310",      # https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/edit?gid=539180310#gid=539180310
+    "B02": "1398594410", # https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/edit?gid=1398594410#gid=1398594410
+    "B03": "475910523", # https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/edit?gid=475910523#gid=475910523
 }
 
 if branch_name not in sheet_gid_map:
