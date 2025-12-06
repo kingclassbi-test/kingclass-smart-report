@@ -26,39 +26,42 @@ if "selected_branch" not in st.session_state:
 
 
 # -----------------------------
-# 3) FUNCTION: LOAD 2567 DATA OF ALL BRANCHES
+# 3) LOAD 2567 (ALL BRANCHES)
 # -----------------------------
 def load_year_2567_all():
-    """โหลดยอดขายปี 2567 จากทุกสาขา (ดึงจากแต่ละ gid)"""
     all_rows = []
 
     for branch, gid in sheet_gid_map.items():
-        url = MASTER_BASE + gid
-        df = pd.read_csv(url)
+        try:
+            df = pd.read_csv(MASTER_BASE + gid)
+            row = df[df["Year"] == 2567].copy()
 
-        # เลือกเฉพาะปี 2567
-        row = df[df["Year"] == 2567].copy()
-        if len(row) > 0:
-            row["Branch"] = branch
-            all_rows.append(row)
+            if len(row) > 0:
+                row["Branch"] = branch
+                all_rows.append(row)
+
+        except Exception as e:
+            st.error(f"โหลดข้อมูลสาขา {branch} ไม่สำเร็จ: {e}")
 
     if not all_rows:
         return pd.DataFrame()
 
     df_all = pd.concat(all_rows, ignore_index=True)
 
-    # จัดลำดับคอลัมน์
-    columns_order = ["Branch", "JAN", "FEB", "MAR", "APR", "MAY",
-                     "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "Total"]
-    return df_all[columns_order]
+    order = [
+        "Branch", "JAN", "FEB", "MAR", "APR", "MAY",
+        "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "Total"
+    ]
+    return df_all[order]
 
 
 # -----------------------------
-# 4) PAGE: OVERVIEW (HOME)
+# 4) PAGE OVERVIEW
 # -----------------------------
 def page_overview():
 
     st.markdown("## 📊 ภาพรวมยอดขายทุกสาขา (ปี 2567)")
+    st.markdown("### 🔎 คลิกชื่อสาขาเพื่อดูรายละเอียดยอดขาย")
 
     df_2567 = load_year_2567_all()
 
@@ -66,58 +69,54 @@ def page_overview():
         st.error("ไม่พบข้อมูลปี 2567")
         return
 
-    # แปลง Branch ให้คลิกได้
+    # ทำลิงก์แบบคลิกได้
     df_show = df_2567.copy()
     df_show["Branch"] = df_show["Branch"].apply(
-        lambda b: f"<a href='?branch={b}' target='_self'>{b}</a>"
+        lambda b: f"<a href='/?branch={b}' target='_self'>{b}</a>"
     )
 
-    st.write("### 🔎 คลิกชื่อสาขาเพื่อดูรายละเอียดยอดขาย")
-    st.write(
-        df_show.to_html(escape=False, index=False),
-        unsafe_allow_html=True
-    )
+    st.write(df_show.to_html(escape=False, index=False), unsafe_allow_html=True)
 
-    # ดักค่าที่ถูกคลิกจาก query param
-    params = st.experimental_get_query_params()
+    # ตรวจ query param เมื่อคลิกสาขา
+    params = st.query_params
     if "branch" in params:
-        st.session_state.selected_branch = params["branch"][0]
+        st.session_state.selected_branch = params["branch"]
         st.session_state.page = "detail"
-        st.experimental_rerun()
+        st.rerun()
 
 
 # -----------------------------
-# 5) PAGE: DETAIL
+# 5) PAGE DETAIL
 # -----------------------------
 def page_detail():
 
     branch = st.session_state.selected_branch
-
-    st.markdown(f"## 📍 รายละเอียดสาขา **{branch}**")
+    st.markdown(f"## 📍 รายละเอียดสาขา {branch}")
 
     if branch not in sheet_gid_map:
         st.error("ไม่พบข้อมูลสาขานี้")
         return
 
-    gid = sheet_gid_map[branch]
-    url = MASTER_BASE + gid
+    try:
+        df = pd.read_csv(MASTER_BASE + sheet_gid_map[branch])
+    except:
+        st.error("โหลดข้อมูลไม่สำเร็จ")
+        return
 
-    df = pd.read_csv(url)
-
-    st.write("### 📘 ตารางยอดขายทุกปี")
+    st.write("### 📘 ยอดขายทุกปีของสาขานี้")
     st.dataframe(df, use_container_width=True)
 
     if st.button("⬅️ กลับหน้าหลัก"):
         st.session_state.page = "overview"
-        st.experimental_set_query_params()
-        st.experimental_rerun()
+        st.session_state.selected_branch = None
+        st.query_params.clear()
+        st.rerun()
 
 
 # -----------------------------
-# 6) PAGE ROUTING
+# 6) PAGE ROUTER
 # -----------------------------
 if st.session_state.page == "overview":
     page_overview()
-
-elif st.session_state.page == "detail":
+else:
     page_detail()
