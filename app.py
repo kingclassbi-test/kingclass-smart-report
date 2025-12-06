@@ -1,27 +1,30 @@
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
-BRANCH_LIST_URL = "https://docs.google.com/spreadsheets/d/1mDVLSD2VWvIEX3pr68hdntZYtqeO7IQZXopvyLEeM6E/export?format=csv"
-MASTER_DATA_URL = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&gid="
+MASTER_URL = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&gid={gid}"
+BRANCH_URL = "https://docs.google.com/spreadsheets/d/1mDVLSD2VWvIEX3pr68hdntZYtqeO7IQZXopvyLEeM6E/export?format=csv"
 
-st.title("📍 เลือกสาขา")
+# 1) โหลด Branch List
+branch_df = pd.read_csv(BRANCH_URL)
+branch_list = branch_df["Branch_Name"].dropna().tolist()
 
-# โหลด Branch list
-branch_df = pd.read_csv(BRANCH_LIST_URL)
-branch_list = branch_df["Branch_Name"].tolist()
+st.selectbox("เลือกสาขา", branch_list, key="branch")
+branch_name = st.session_state.branch
 
-# Dropdown เลือกสาขา
-branch = st.selectbox("เลือกสาขา", branch_list)
+st.write("คุณเลือก:", branch_name)
 
-st.write(f"คุณเลือก: **{branch}**")
+# 2) ดึง gid ของแท็บใน Master ตามชื่อสาขา
+sheet_gid_map = {
+    "B01": "0",      # gid=539180310
+    "B02": "123456", # gid=1398594410
+    "B03": "789012", # gid=475910523
+}
 
-# โหลดข้อมูลของสาขานี้
-try:
-    tab_url = f"https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&sheet={branch}"
-    df = pd.read_csv(tab_url)
+if branch_name not in sheet_gid_map:
+    st.error("ยังไม่มีข้อมูลสาขานี้ใน Master")
+else:
+    gid = sheet_gid_map[branch_name]
+    url = MASTER_URL.format(gid=gid)
 
-    st.subheader(f"📊 ยอดขายสาขา: {branch}")
+    df = pd.read_csv(url)
     st.dataframe(df)
-
-except Exception:
-    st.error("🚫 ยังไม่มีข้อมูลของสาขานี้ใน Master Data")
