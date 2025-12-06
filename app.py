@@ -3,8 +3,8 @@ import streamlit as st
 
 st.set_page_config(layout="wide")  # ⭐ ทำให้หน้าเว็บกว้างเต็มจอ
 
-MASTER_URL = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&gid="
-BRANCH_URL = "https://docs.google.com/spreadsheets/d/1mDVLSD2VWvIEX3pr68hdntZYtqe07IQZXopvyLEeM6E/export?format=csv&gid=0"
+branch_df = pd.read_csv(BRANCH_URL)
+master_df = pd.read_csv(MASTER_URL)
 
 # โหลดรายชื่อสาขา
 branch_df = pd.read_csv(BRANCH_URL)
