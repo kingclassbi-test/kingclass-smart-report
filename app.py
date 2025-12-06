@@ -1,30 +1,33 @@
 import pandas as pd
 import streamlit as st
 
-MASTER_URL = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&gid={gid}"
-BRANCH_URL = "https://docs.google.com/spreadsheets/d/1mDVLSD2VWvIEX3pr68hdntZYtqeO7IQZXopvyLEeM6E/export?format=csv"
+st.set_page_config(layout="wide")  # ⭐ ทำให้หน้าเว็บกว้างเต็มจอ
 
-# 1) โหลด Branch List
+MASTER_URL = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&gid="
+BRANCH_URL = "https://docs.google.com/spreadsheets/d/1mDVLSD2VWvIEX3pr68hdntZYtqe07IQZXopvyLEeM6E/export?format=csv&gid=0"
+
+# โหลดรายชื่อสาขา
 branch_df = pd.read_csv(BRANCH_URL)
 branch_list = branch_df["Branch_Name"].dropna().tolist()
 
-st.selectbox("เลือกสาขา", branch_list, key="branch")
-branch_name = st.session_state.branch
+branch_name = st.selectbox("เลือกสาขา", branch_list, key="branch")
+st.write(f"คุณเลือก: **{branch_name}**")
 
-st.write("คุณเลือก:", branch_name)
-
-# 2) ดึง gid ของแท็บใน Master ตามชื่อสาขา
+# mapping gid
 sheet_gid_map = {
-    "B01": "539180310",      # https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/edit?gid=539180310#gid=539180310
-    "B02": "1398594410", # https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/edit?gid=1398594410#gid=1398594410
-    "B03": "475910523", # https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/edit?gid=475910523#gid=475910523
+    "B01": "539180310",
+    "B02": "1398594410",
+    "B03": "475910523",
 }
 
 if branch_name not in sheet_gid_map:
     st.error("ยังไม่มีข้อมูลสาขานี้ใน Master")
 else:
     gid = sheet_gid_map[branch_name]
-    url = MASTER_URL.format(gid=gid)
-
+    url = MASTER_URL + gid
     df = pd.read_csv(url)
-    st.dataframe(df)
+
+    st.subheader(f"📊 ยอดขายสาขา: {branch_name}")
+
+    # ⭐⭐ ตารางเต็มจอ ไม่ต้องเลื่อน
+    st.dataframe(df, use_container_width=True)
