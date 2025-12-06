@@ -1,126 +1,123 @@
 import streamlit as st
 import pandas as pd
 
-# ----------------------------
-# Page config
-# ----------------------------
-st.set_page_config(layout="wide")
+# -----------------------------
+# 1) CONFIG URLs
+# -----------------------------
 
-# ----------------------------
-# Custom CSS – make the page full width
-# ----------------------------
-st.markdown("""
-<style>
-.block-container { max-width: 100% !important; padding-left: 1rem; padding-right: 1rem; }
-a { text-decoration: none !important; font-weight: 600; }
-</style>
-""", unsafe_allow_html=True)
-
-# ----------------------------
-# Google Sheet URLs
-# ----------------------------
 BRANCH_URL = "https://docs.google.com/spreadsheets/d/1mDVLSD2VWvIEX3pr68hdntZYtqeO7IQZXopvyLEeM6E/export?format=csv"
 MASTER_BASE = "https://docs.google.com/spreadsheets/d/1kF_fBpWMoRgPPXjIhfZBI31xEoWvGKYJA4TTNYX1CIM/export?format=csv&gid="
 
-# ----------------------------
-# Load Branch List
-# ----------------------------
-branch_df = pd.read_csv(BRANCH_URL)
-branch_list = branch_df["Branch_Name"].dropna().tolist()
-
-# ----------------------------
-# Mapping branch → gid
-# ----------------------------
+# GID mapping (จากคุณนิก)
 sheet_gid_map = {
     "B01": "539180310",
     "B02": "1398594410",
     "B03": "475910523",
 }
 
-# ----------------------------
-# Initialize navigation state
-# ----------------------------
+# -----------------------------
+# 2) INITIAL PAGE STATE
+# -----------------------------
 if "page" not in st.session_state:
     st.session_state.page = "overview"
+
 if "selected_branch" not in st.session_state:
     st.session_state.selected_branch = None
 
-def go_to_branch(b):
-    st.session_state.selected_branch = b
-    st.session_state.page = "detail"
 
+# -----------------------------
+# 3) FUNCTION: LOAD 2567 DATA OF ALL BRANCHES
+# -----------------------------
+def load_year_2567_all():
+    """โหลดยอดขายปี 2567 จากทุกสาขา (ดึงจากแต่ละ gid)"""
+    all_rows = []
 
-# ============================================================
-#                     📍 PAGE 1: OVERVIEW
-# ============================================================
-if st.session_state.page == "overview":
-
-    st.title("📊 ภาพรวมยอดขายทุกสาขา (ปี 2567)")
-
-    rows = []
-
-    for branch in branch_list:
-        if branch not in sheet_gid_map:
-            continue
-
-        gid = sheet_gid_map[branch]
+    for branch, gid in sheet_gid_map.items():
         url = MASTER_BASE + gid
         df = pd.read_csv(url)
 
-        df_2567 = df[df["Year"] == 2567]
+        # เลือกเฉพาะปี 2567
+        row = df[df["Year"] == 2567].copy()
+        if len(row) > 0:
+            row["Branch"] = branch
+            all_rows.append(row)
 
-        if df_2567.empty:
-            continue
+    if not all_rows:
+        return pd.DataFrame()
 
-        row = df_2567.iloc[0].to_dict()
-        row["Branch"] = branch
+    df_all = pd.concat(all_rows, ignore_index=True)
 
-        rows.append(row)
-
-    # Convert to DataFrame
-    overview_df = pd.DataFrame(rows)
-
-    # จัดคอลัมน์ให้อยู่ลำดับที่ต้องการ
-    cols_order = ["Branch", "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-                  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "Total"]
-
-    overview_df = overview_df[cols_order]
-
-    # เปลี่ยนชื่อคอลัมน์ให้สวยงาม
-    overview_df.rename(columns={"Branch": "สาขา", "Total": "ยอดรวมปี 2567"}, inplace=True)
-
-    # 🔗 ทำให้ชื่อสาขาคลิกได้ (Link)
-    def make_clickable(branch):
-        return f'<a href="?branch={branch}">{branch}</a>'
-
-    overview_df["สาขา"] = overview_df["สาขา"].apply(make_clickable)
-
-    # แสดงเป็น HTML table (รองรับคลิก)
-    st.write(overview_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+    # จัดลำดับคอลัมน์
+    columns_order = ["Branch", "JAN", "FEB", "MAR", "APR", "MAY",
+                     "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "Total"]
+    return df_all[columns_order]
 
 
-    # ตรวจจับ parameter จาก URL → ใช้สำหรับคลิก
-    query_params = st.experimental_get_query_params()
-    if "branch" in query_params:
-        selected = query_params["branch"][0]
-        go_to_branch(selected)
+# -----------------------------
+# 4) PAGE: OVERVIEW (HOME)
+# -----------------------------
+def page_overview():
+
+    st.markdown("## 📊 ภาพรวมยอดขายทุกสาขา (ปี 2567)")
+
+    df_2567 = load_year_2567_all()
+
+    if df_2567.empty:
+        st.error("ไม่พบข้อมูลปี 2567")
+        return
+
+    # แปลง Branch ให้คลิกได้
+    df_show = df_2567.copy()
+    df_show["Branch"] = df_show["Branch"].apply(
+        lambda b: f"<a href='?branch={b}' target='_self'>{b}</a>"
+    )
+
+    st.write("### 🔎 คลิกชื่อสาขาเพื่อดูรายละเอียดยอดขาย")
+    st.write(
+        df_show.to_html(escape=False, index=False),
+        unsafe_allow_html=True
+    )
+
+    # ดักค่าที่ถูกคลิกจาก query param
+    params = st.experimental_get_query_params()
+    if "branch" in params:
+        st.session_state.selected_branch = params["branch"][0]
+        st.session_state.page = "detail"
+        st.experimental_rerun()
 
 
-# ============================================================
-#               📍 PAGE 2: Branch Detail Page
-# ============================================================
-elif st.session_state.page == "detail":
+# -----------------------------
+# 5) PAGE: DETAIL
+# -----------------------------
+def page_detail():
 
     branch = st.session_state.selected_branch
-    st.title(f"📌 รายละเอียดยอดขายสาขา {branch}")
+
+    st.markdown(f"## 📍 รายละเอียดสาขา **{branch}**")
+
+    if branch not in sheet_gid_map:
+        st.error("ไม่พบข้อมูลสาขานี้")
+        return
 
     gid = sheet_gid_map[branch]
     url = MASTER_BASE + gid
+
     df = pd.read_csv(url)
 
+    st.write("### 📘 ตารางยอดขายทุกปี")
     st.dataframe(df, use_container_width=True)
 
-    # ปุ่มกลับหน้าแรก
     if st.button("⬅️ กลับหน้าหลัก"):
         st.session_state.page = "overview"
-        st.experimental_set_query_params()  # clear URL params
+        st.experimental_set_query_params()
+        st.experimental_rerun()
+
+
+# -----------------------------
+# 6) PAGE ROUTING
+# -----------------------------
+if st.session_state.page == "overview":
+    page_overview()
+
+elif st.session_state.page == "detail":
+    page_detail()
