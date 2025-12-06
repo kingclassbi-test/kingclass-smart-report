@@ -4,3 +4,5 @@ numpy
 matplotlib
 plotly
 openpyxl
+gspread
+oauth2client
