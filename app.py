@@ -12,17 +12,13 @@ if uploaded_file:
     month_order = ["January","February","March","April","May","June","July",
                    "August","September","October","November","December"]
 
-    # ทำความสะอาดชื่อคอลัมน์
     df.columns = [str(c).strip() for c in df.columns]
-
-    # ระบุคอลัมน์เดือนที่มีอยู่จริงในไฟล์
     month_cols = [m for m in month_order if m in df.columns]
 
-    # แปลงคอลัมน์เดือนเป็นตัวเลข (ถ้าแปลงไม่ได้ ให้เป็น 0)
+    # แปลงคอลัมน์เดือนให้เป็นตัวเลข
     for m in month_cols:
         df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
 
-    # Dropdown เลือกสาขา
     branch_list = df["Branch"].unique()
     selected_branch = st.selectbox("เลือกสาขา", branch_list)
 
@@ -30,19 +26,21 @@ if uploaded_file:
 
     branch_data = df[df["Branch"] == selected_branch]
 
-    # ตารางสรุป Jan–Dec
     display_df = branch_data[["Branch"] + month_cols].copy()
     display_df["Total"] = display_df[month_cols].sum(axis=1)
 
-    st.dataframe(display_df.style.format("{:,.0f}"))
+    # ⭐ แก้ ERROR: format เฉพาะคอลัมน์ตัวเลข
+    numeric_cols = month_cols + ["Total"]
+    styled_df = display_df.style.format("{:,.0f}", subset=numeric_cols)
 
-    # สรุปยอดรวมรายเดือนเพื่อทำกราฟ
+    st.dataframe(styled_df)
+
+    # สรุปยอดรายเดือน
     monthly_sum = branch_data[month_cols].sum()
 
     st.subheader("📈 กราฟแนวโน้มยอดขายรายเดือน")
     st.line_chart(monthly_sum)
 
-    # KPI สรุปทั้งปี
     st.subheader("✨ สรุปผลรวมทั้งปี")
     col1, col2, col3 = st.columns(3)
     col1.metric("ยอดรวมทั้งปี", f"{monthly_sum.sum():,.0f} บาท")
